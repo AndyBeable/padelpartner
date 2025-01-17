@@ -29,13 +29,14 @@
             <h2 class="text-lg font-semibold mb-4">Select Date</h2>
             <div>
               <label for="date" class="block text-sm font-medium text-gray-700">Date</label>
-              <input type="date" id="date" v-model="selectedDate" @change="fetchCourtData"
+              <input type="date" id="date" v-model="selectedDate"
                 class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
             </div>
           </div>
 
           <div class="min-w-60 max-w-80 flex flex-col">
-            <CourtSelector :courts="courts" :selectedDate="selectedDate || ''" @courtBooked="handleBooking" />
+            <CourtSelector v-if="venue?.court" :courts="venue?.court" :selectedDate="selectedDate || ''"
+              :venueId="venue?.venue_id" />
           </div>
 
         </div>
@@ -52,7 +53,6 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { supabase } from '../lib/supabaseClient.js';
-import { useBooking } from './composables/useBooking';
 import CourtSelector from '@/components/CourtSelector.vue';
 
 interface Court {
@@ -65,15 +65,12 @@ interface Court {
 const route = useRoute();
 const venue_id = route.params.venue_id;
 const venue = ref(null);
-const courts = ref<Court[]>([]);
 const selectedDate = ref<string | null>(null);
-
-const { bookingError, bookingSuccess, bookCourt } = useBooking();
 
 const fetchVenueData = async () => {
   const { data: venueData, error: venueError } = await supabase
     .from('venue')
-    .select('*')
+    .select(`*, court(*)`)
     .eq('venue_id', venue_id)
     .single();
 
@@ -84,61 +81,6 @@ const fetchVenueData = async () => {
   }
 };
 
-
-const fetchCourtData = async () => {
-
-  if (!selectedDate.value) return;
-
-  try {
-    const numberVenueId = Number(venue_id);
-
-    // Step 1: Fetch booked court IDs for the selected date
-    const { data: bookedCourts, error: bookingError } = await supabase
-      .from('booking')
-      .select('court_id')
-      .eq('venue_id', numberVenueId)
-      .eq('booking_date', selectedDate.value);
-
-    if (bookingError) {
-      console.error('Error fetching booked courts:', bookingError);
-      return;
-    }
-
-    const bookedCourtIds = bookedCourts.map(booking => booking.court_id);
-
-    // Step 2: Fetch all courts for the venue
-    const { data: allCourts, error: courtError } = await supabase
-      .from('court')
-      .select('*')
-      .eq('venue_id', numberVenueId);
-
-    if (courtError) {
-      console.error('Error fetching courts:', courtError);
-      return;
-    }
-
-    const availableCourts = allCourts.filter(court => !bookedCourtIds.includes(court.court_id));
-
-    courts.value = availableCourts;
-    console.log('Fetched available courts:', availableCourts);
-  } catch (err) {
-    console.error('Unexpected error fetching courts:', err);
-  }
-};
-
-const handleBooking = async (courtId: number, selectedSlot: string) => {
-  if (!selectedDate.value) return;
-
-  const result = await bookCourt(1, courtId, Number(venue_id), selectedDate.value, selectedSlot, '60');
-
-  if (result.success) {
-    bookingSuccess.value = true;
-    console.log('Booking successful!');
-  } else {
-    bookingError.value = result.error || null;
-    console.error('Booking failed:', result.error);
-  }
-};
 
 onMounted(() => {
   fetchVenueData();

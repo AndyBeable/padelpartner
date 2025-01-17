@@ -6,27 +6,19 @@ export const useBooking = () => {
   const bookingSuccess = ref(false);
 
   const bookCourt = async (customerId: number, courtId: number, venueId: number, bookingDate: string, startTime: string, duration: string) => {
-    bookingError.value = null; // Reset error state
-    bookingSuccess.value = false; // Reset success state
+    bookingError.value = null;
+    bookingSuccess.value = false;
 
-    const { error } = await supabase.from('booking').insert({
+    const { data } = await supabase.from('booking').insert({
       customer_id: customerId,
       court_id: courtId,
       venue_id: venueId,
       booking_date: bookingDate,
       start_time: startTime,
       duration: duration
-    });
+    }).select();
 
-    if (error) {
-      console.error('Error inserting booking:', error);
-      bookingError.value = error.message; // Set error message
-      return { success: false, error: error.message };
-    } else {
-      console.log('Booking successful!');
-      bookingSuccess.value = true; // Set success state
-      return { success: true };
-    }
+    return data || [];
   };
 
   return {
